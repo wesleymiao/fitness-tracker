@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>运动打卡</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #4F46E5;
+  --primary-light: #818CF8;
+  --bg: #F9FAFB;
+  --card: #FFFFFF;
+  --text: #1F2937;
+  --text-secondary: #6B7280;
+  --border: #E5E7EB;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+.header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  padding: 24px 20px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 { font-size: 22px; font-weight: 700; }
+.header .date { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+.stats-row {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  overflow-x: auto;
+}
+.stat-card {
+  flex: 1;
+  min-width: 90px;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.stat-card .num { font-size: 24px; font-weight: 700; color: var(--primary); }
+.stat-card .label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.section { padding: 0 20px; margin-top: 20px; }
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.checkin-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+}
+.checkin-btn:active { transform: scale(0.97); }
+.checkin-btn.done {
+  background: var(--success);
+  box-shadow: 0 4px 14px rgba(16,185,129,0.35);
+}
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--card);
+  width: 100%;
+  max-width: 500px;
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px 36px;
+  animation: slideUp 0.3s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; text-align: center; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary); }
+.form-group select,
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  background: var(--bg);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.form-group select { background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.form-actions { display: flex; gap: 10px; margin-top: 20px; }
+.form-actions button {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-cancel { background: var(--bg); color: var(--text-secondary); }
+.btn-submit { background: var(--primary); color: white; }
+
+/* History */
+.history-item {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-item .left { flex: 1; }
+.history-item .type { font-weight: 600; font-size: 15px; }
+.history-item .meta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.history-item .duration { font-size: 20px; font-weight: 700; color: var(--primary); }
+.history-item .unit { font-size: 12px; color: var(--text-secondary); }
+.delete-btn {
+  background: none; border: none; color: var(--text-secondary); font-size: 18px;
+  cursor: pointer; padding: 4px 8px; opacity: 0.5;
+}
+.delete-btn:hover { opacity: 1; color: var(--danger); }
+
+/* Advice */
+.advice-card {
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 12px;
+}
+.advice-card .icon { font-size: 20px; margin-bottom: 6px; }
+.advice-card .text { font-size: 14px; line-height: 1.6; color: #92400E; }
+
+/* Calendar */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+.cal-header { font-size: 11px; color: var(--text-secondary); text-align: center; font-weight: 500; }
+.cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+}
+.cal-day.today { border: 2px solid var(--primary); color: var(--primary); font-weight: 700; }
+.cal-day.active { background: var(--primary); color: white; font-weight: 600; }
+.cal-day.active.today { background: var(--primary); color: white; border-color: var(--primary); }
+.cal-day.empty { visibility: hidden; }
+
+/* Tab bar */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  display: flex;
+  border-top: 1px solid var(--border);
+  padding: 8px 0 env(safe-area-inset-bottom, 8px);
+  z-index: 100;
+}
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.tab.active { color: var(--primary); }
+.tab svg { width: 22px; height: 22px; }
+.page { display: none; }
+.page.active { display: block; }
+
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 14px; }
+
+/* Weekly chart */
+.week-chart { display: flex; align-items: flex-end; gap: 8px; height: 120px; margin-top: 12px; }
+.week-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.week-bar { width: 100%; border-radius: 6px 6px 0 0; background: var(--primary); opacity: 0.7; min-height: 2px; transition: height 0.3s; }
+.week-bar.today-bar { opacity: 1; }
+.week-label { font-size: 11px; color: var(--text-secondary); }
+.week-val { font-size: 10px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏃 运动打卡</h1>
+  <div class="date" id="todayDate"></div>
+  <div class="streak-badge" id="streakBadge">🔥 连续 <span id="streakNum">0</span> 天</div>
+</div>
+
+<!-- Page: Home -->
+<div class="page active" id="page-home">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num" id="todayMin">0</div>
+      <div class="label">今日(分钟)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="weekMin">0</div>
+      <div class="label">本周(分钟)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="monthDays">0</div>
+      <div class="label">本月打卡(天)</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <button class="checkin-btn" id="checkinBtn" onclick="openModal()">＋ 记录运动</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📊 本周运动量</div>
+    <div class="week-chart" id="weekChart"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">💡 今日建议</div>
+    <div class="advice-card">
+      <div class="icon">🧠</div>
+      <div class="text" id="adviceText">加载中...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📝 最近记录</div>
+    <div id="recentList"></div>
+  </div>
+</div>
+
+<!-- Page: Calendar -->
+<div class="page" id="page-calendar">
+  <div class="section" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <button onclick="changeMonth(-1)" style="background:none;border:none;font-size:20px;cursor:pointer">‹</button>
+      <div class="section-title" id="calMonthTitle" style="margin-bottom:0"></div>
+      <button onclick="changeMonth(1)" style="background:none;border:none;font-size:20px;cursor:pointer">›</button>
+    </div>
+    <div class="calendar" id="calendarGrid"></div>
+  </div>
+  <div class="section">
+    <div class="section-title" id="calDaySummary"></div>
+    <div id="calDayRecords"></div>
+  </div>
+</div>
+
+<!-- Page: Stats -->
+<div class="page" id="page-stats">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num" id="totalSessions">0</div>
+      <div class="label">总运动次数</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="totalMinutes">0</div>
+      <div class="label">总运动(分钟)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="avgPerDay">0</div>
+      <div class="label">日均(分钟)</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">运动类型分布</div>
+    <div id="typeStats"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">⚙️ 数据管理</div>
+    <button onclick="exportData()" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);font-size:14px;cursor:pointer;margin-bottom:8px">📤 导出数据 (JSON)</button>
+    <button onclick="document.getElementById('importFile').click()" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);font-size:14px;cursor:pointer;margin-bottom:8px">📥 导入数据</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button onclick="clearAllData()" style="width:100%;padding:12px;border:1.5px solid var(--danger);border-radius:10px;background:white;font-size:14px;cursor:pointer;color:var(--danger)">🗑 清除所有数据</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>记录运动</h2>
+    <div class="form-group">
+      <label>运动类型</label>
+      <select id="exType">
+        <option value="跑步">🏃 跑步</option>
+        <option value="快走">🚶 快走</option>
+        <option value="游泳">🏊 游泳</option>
+        <option value="骑行">🚴 骑行</option>
+        <option value="瑜伽">🧘 瑜伽</option>
+        <option value="力量训练">🏋️ 力量训练</option>
+        <option value="跳绳">⏭ 跳绳</option>
+        <option value="羽毛球">🏸 羽毛球</option>
+        <option value="篮球">🏀 篮球</option>
+        <option value="跳操">💃 跳操/舞蹈</option>
+        <option value="爬山">🏔 爬山</option>
+        <option value="其他">📌 其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>时长（分钟）</label>
+      <input type="number" id="exDuration" placeholder="30" min="1" max="600" inputmode="numeric">
+    </div>
+    <div class="form-group">
+      <label>强度</label>
+      <select id="exIntensity">
+        <option value="低">🟢 低强度（散步、慢瑜伽）</option>
+        <option value="中" selected>🟡 中等强度（快走、慢跑）</option>
+        <option value="高">🔴 高强度（HIIT、快跑）</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input type="text" id="exNote" placeholder="今天感觉如何？">
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-submit" onclick="saveRecord()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab active" onclick="switchPage('home',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+    首页
+  </button>
+  <button class="tab" onclick="switchPage('calendar',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    日历
+  </button>
+  <button class="tab" onclick="switchPage('stats',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+    统计
+  </button>
+</div>
+
+<script>
+const STORAGE_KEY = 'fitness_records';
+const ICONS = {'跑步':'🏃','快走':'🚶','游泳':'🏊','骑行':'🚴','瑜伽':'🧘','力量训练':'🏋️','跳绳':'⏭','羽毛球':'🏸','篮球':'🏀','跳操':'💃','爬山':'🏔','其他':'📌'};
+
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+
+function getRecords() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+}
+function saveRecords(r) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(r));
+}
+
+function dateStr(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return dateStr(new Date()); }
+
+function formatDate(s) {
+  const d = new Date(s);
+  const days = ['日','一','二','三','四','五','六'];
+  return `${d.getMonth()+1}月${d.getDate()}日 周${days[d.getDay()]}`;
+}
+
+// Modal
+function openModal() {
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('exDuration').value = '';
+  document.getElementById('exNote').value = '';
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function saveRecord() {
+  const type = document.getElementById('exType').value;
+  const dur = parseInt(document.getElementById('exDuration').value);
+  const intensity = document.getElementById('exIntensity').value;
+  const note = document.getElementById('exNote').value.trim();
+  if (!dur || dur < 1) { alert('请输入运动时长'); return; }
+  const records = getRecords();
+  records.unshift({
+    id: Date.now(),
+    date: todayStr(),
+    time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}),
+    type, duration: dur, intensity, note
+  });
+  saveRecords(records);
+  closeModal();
+  refresh();
+}
+
+function deleteRecord(id) {
+  if (!confirm('确定删除这条记录吗？')) return;
+  const records = getRecords().filter(r => r.id !== id);
+  saveRecords(records);
+  refresh();
+}
+
+// Stats
+function getStreak() {
+  const records = getRecords();
+  const daySet = new Set(records.map(r => r.date));
+  let streak = 0;
+  let d = new Date();
+  // check today first
+  if (!daySet.has(dateStr(d))) {
+    d.setDate(d.getDate() - 1);
+    if (!daySet.has(dateStr(d))) return 0;
+  }
+  while (daySet.has(dateStr(d))) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function refresh() {
+  const records = getRecords();
+  const today = todayStr();
+  const now = new Date();
+
+  // Header date
+  const days = ['日','一','二','三','四','五','六'];
+  document.getElementById('todayDate').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 星期${days[now.getDay()]}`;
+
+  // Streak
+  const streak = getStreak();
+  document.getElementById('streakNum').textContent = streak;
+
+  // Today minutes
+  const todayRecs = records.filter(r => r.date === today);
+  const todayMin = todayRecs.reduce((s, r) => s + r.duration, 0);
+  document.getElementById('todayMin').textContent = todayMin;
+
+  // Checkin button
+  const btn = document.getElementById('checkinBtn');
+  if (todayRecs.length > 0) {
+    btn.textContent = `✅ 今日已运动 ${todayMin} 分钟（继续添加）`;
+    btn.classList.add('done');
+  } else {
+    btn.textContent = '＋ 记录运动';
+    btn.classList.remove('done');
+  }
+
+  // Week minutes
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + 1);
+  const weekStr = dateStr(weekStart);
+  const weekMin = records.filter(r => r.date >= weekStr).reduce((s, r) => s + r.duration, 0);
+  document.getElementById('weekMin').textContent = weekMin;
+
+  // Month days
+  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthDays = new Set(records.filter(r => r.date.startsWith(monthPrefix)).map(r => r.date)).size;
+  document.getElementById('monthDays').textContent = monthDays;
+
+  // Week chart
+  renderWeekChart(records, now);
+
+  // Advice
+  generateAdvice(records, todayMin, weekMin, streak);
+
+  // Recent list
+  renderRecent(records.slice(0, 10));
+
+  // Stats page
+  renderStats(records);
+
+  // Calendar
+  renderCalendar();
+}
+
+function renderWeekChart(records, now) {
+  const chart = document.getElementById('weekChart');
+  const labels = ['一','二','三','四','五','六','日'];
+  const weekStart = new Date(now);
+  const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  weekStart.setDate(now.getDate() - dayOfWeek);
+
+  let maxMin = 0;
+  const dayMins = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    const ds = dateStr(d);
+    const mins = records.filter(r => r.date === ds).reduce((s, r) => s + r.duration, 0);
+    dayMins.push(mins);
+    if (mins > maxMin) maxMin = mins;
+  }
+  if (maxMin === 0) maxMin = 60;
+
+  chart.innerHTML = dayMins.map((m, i) => {
+    const h = Math.max(2, (m / maxMin) * 90);
+    const isToday = i === dayOfWeek;
+    return `<div class="week-bar-wrap">
+      <div class="week-val">${m > 0 ? m : ''}</div>
+      <div class="week-bar ${isToday?'today-bar':''}" style="height:${h}px"></div>
+      <div class="week-label">${labels[i]}</div>
+    </div>`;
+  }).join('');
+}
+
+function generateAdvice(records, todayMin, weekMin, streak) {
+  const advices = [];
+  const todayRecs = records.filter(r => r.date === todayStr());
+  const types = todayRecs.map(r => r.type);
+
+  if (todayMin === 0) {
+    advices.push('今天还没运动哦！建议至少做30分钟中等强度运动，比如快走或慢跑。');
+  } else if (todayMin < 30) {
+    advices.push(`今天运动了${todayMin}分钟，离推荐的30分钟还差一点，加油！可以再做一组拉伸或散步来补充。`);
+  } else if (todayMin >= 30 && todayMin < 60) {
+    advices.push(`很棒！今天已运动${todayMin}分钟，达到了基础目标 👏 注意运动后补充水分和蛋白质。`);
+  } else {
+    advices.push(`今天运动${todayMin}分钟，非常充实！注意不要过度训练，给身体足够的恢复时间。`);
+  }
+
+  // Check exercise variety
+  const recentTypes = new Set(records.slice(0, 14).map(r => r.type));
+  if (recentTypes.size <= 1 && records.length > 3) {
+    advices.push('建议尝试不同类型的运动，有氧+力量+柔韧性搭配效果更好。');
+  }
+
+  // Strength training reminder
+  const weekRecs = records.filter(r => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return r.date >= dateStr(d);
+  });
+  const hasStrength = weekRecs.some(r => r.type === '力量训练');
+  if (!hasStrength && weekRecs.length > 0) {
+    advices.push('本周还没有力量训练，建议每周至少2次力量训练来维持肌肉量和骨密度。');
+  }
+
+  // Rest day
+  if (todayMin > 90) {
+    advices.push('运动量较大，明天建议安排休息日或做低强度的瑜伽/拉伸。');
+  }
+
+  // Weekly target
+  const WHO_TARGET = 150;
+  if (weekMin < WHO_TARGET) {
+    advices.push(`WHO建议每周至少150分钟中等强度运动，本周已完成${weekMin}分钟，还差${WHO_TARGET - weekMin}分钟。`);
+  } else {
+    advices.push(`本周已完成${weekMin}分钟运动，超过WHO推荐的150分钟标准，继续保持！🎉`);
+  }
+
+  if (streak >= 7) {
+    advices.push(`已经连续打卡${streak}天了！坚持得很好，但也记得安排适当的休息日。`);
+  } else if (streak >= 3) {
+    advices.push(`连续${streak}天打卡，习惯正在养成中！坚持21天就能形成稳固的运动习惯。`);
+  }
+
+  document.getElementById('adviceText').innerHTML = advices.map(a => `• ${a}`).join('<br>');
+}
+
+function renderRecent(records) {
+  const list = document.getElementById('recentList');
+  if (records.length === 0) {
+    list.innerHTML = '<div class="empty-state">还没有运动记录<br>点击上方按钮开始打卡吧 💪</div>';
+    return;
+  }
+  list.innerHTML = records.map(r => `
+    <div class="history-item">
+      <div class="left">
+        <div class="type">${ICONS[r.type]||'📌'} ${r.type}</div>
+        <div class="meta">${formatDate(r.date)} ${r.time || ''} · ${r.intensity}强度${r.note ? ' · '+r.note : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="text-align:right">
+          <div class="duration">${r.duration}</div>
+          <div class="unit">分钟</div>
+        </div>
+        <button class="delete-btn" onclick="deleteRecord(${r.id})">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Calendar page
+function renderCalendar() {
+  const records = getRecords();
+  const daySet = new Set(records.map(r => r.date));
+  const grid = document.getElementById('calendarGrid');
+  const title = document.getElementById('calMonthTitle');
+
+  title.textContent = `${calYear}年${calMonth + 1}月`;
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  let startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Monday start
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+
+  const headers = ['一','二','三','四','五','六','日'];
+  let html = headers.map(h => `<div class="cal-header">${h}</div>`).join('');
+
+  for (let i = 0; i < startDay; i++) html += '<div class="cal-day empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = calYear === today.getFullYear() && calMonth === today.getMonth() && d === today.getDate();
+    const isActive = daySet.has(ds);
+    html += `<div class="cal-day ${isToday?'today':''} ${isActive?'active':''}" onclick="showDayRecords('${ds}')">${d}</div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function showDayRecords(ds) {
+  const records = getRecords().filter(r => r.date === ds);
+  const summary = document.getElementById('calDaySummary');
+  const container = document.getElementById('calDayRecords');
+  summary.textContent = `${formatDate(ds)} 记录`;
+  if (records.length === 0) {
+    container.innerHTML = '<div class="empty-state">当天没有运动记录</div>';
+  } else {
+    const total = records.reduce((s,r) => s + r.duration, 0);
+    container.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">共 ${records.length} 次运动，合计 ${total} 分钟</div>` +
+      records.map(r => `<div class="history-item"><div class="left"><div class="type">${ICONS[r.type]||'📌'} ${r.type}</div><div class="meta">${r.time||''} · ${r.intensity}强度${r.note?' · '+r.note:''}</div></div><div style="text-align:right"><div class="duration">${r.duration}</div><div class="unit">分钟</div></div></div>`).join('');
+  }
+}
+
+function changeMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+// Stats page
+function renderStats(records) {
+  document.getElementById('totalSessions').textContent = records.length;
+  const totalMin = records.reduce((s,r) => s + r.duration, 0);
+  document.getElementById('totalMinutes').textContent = totalMin;
+  const activeDays = new Set(records.map(r => r.date)).size;
+  document.getElementById('avgPerDay').textContent = activeDays > 0 ? Math.round(totalMin / activeDays) : 0;
+
+  // Type breakdown
+  const typeMap = {};
+  records.forEach(r => {
+    if (!typeMap[r.type]) typeMap[r.type] = { count: 0, mins: 0 };
+    typeMap[r.type].count++;
+    typeMap[r.type].mins += r.duration;
+  });
+  const container = document.getElementById('typeStats');
+  const sorted = Object.entries(typeMap).sort((a,b) => b[1].mins - a[1].mins);
+  if (sorted.length === 0) {
+    container.innerHTML = '<div class="empty-state">暂无数据</div>';
+  } else {
+    const maxMins = sorted[0][1].mins;
+    container.innerHTML = sorted.map(([type, data]) => {
+      const pct = Math.round((data.mins / totalMin) * 100);
+      const barW = Math.max(5, (data.mins / maxMins) * 100);
+      return `<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px">
+          <span>${ICONS[type]||'📌'} ${type}</span>
+          <span style="color:var(--text-secondary)">${data.count}次 · ${data.mins}分钟 · ${pct}%</span>
+        </div>
+        <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:var(--primary);border-radius:4px"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// Export / Import
+function exportData() {
+  const data = getRecords();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `fitness_${todayStr()}.json`;
+  a.click();
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error();
+      const existing = getRecords();
+      const ids = new Set(existing.map(r => r.id));
+      const newRecs = data.filter(r => !ids.has(r.id));
+      saveRecords([...newRecs, ...existing].sort((a,b) => b.id - a.id));
+      refresh();
+      alert(`成功导入 ${newRecs.length} 条新记录`);
+    } catch { alert('文件格式错误'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function clearAllData() {
+  if (!confirm('确定要清除所有运动记录吗？此操作不可撤销！')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  refresh();
+}
+
+function switchPage(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  el.classList.add('active');
+  if (page === 'calendar') renderCalendar();
+}
+
+// Init
+refresh();
+</script>
+</body>
+</html>
